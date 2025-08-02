@@ -5,6 +5,7 @@ import base64
 import io
 import sqlite3
 import time
+import os
 
 app = Flask(__name__)
 
@@ -196,4 +197,9 @@ def simulate_payment(transaction_id):
 # Main Entry Point
 # ==============================================================================
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Use Gunicorn for production on Render
+    # For local testing, app.run() is fine.
+    # On Render, the `gunicorn app:app` command will be used.
+    # The `os.environ.get('PORT')` is important for Render deployment.
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
