@@ -1,6 +1,6 @@
 # app.py
-# A complete Flask application to handle QR code generation and payment webhooks.
-# កម្មវិធី Flask ពេញលេញមួយដើម្បីគ្រប់គ្រងការបង្កើត QR code និង webhooks នៃការទូទាត់។
+# This Flask application provides a web server with an API for your BJS bot.
+# កម្មវិធី Flask នេះផ្តល់ម៉ាស៊ីនមេគេហទំព័រជាមួយនឹង API សម្រាប់ BJS bot របស់អ្នក។
 
 from flask import Flask, request, jsonify, render_template_string
 import requests
@@ -60,7 +60,7 @@ def payment_status_checker():
                 continue
 
             if datetime.now() > payment['expires_at']:
-                logging.warning(f"Payment for invoice {invoice_id} expired.")
+                logging.warning(f"Payment for invoice {invoice_id} expired. Removing.")
                 del pending_payments[invoice_id]
                 continue
 
@@ -88,6 +88,7 @@ def payment_status_checker():
                     }
                     
                     try:
+                        # Call the BJS webhook to notify the bot about the successful payment
                         requests.post(bjs_webhook_url, json=webhook_data)
                         logging.info(f"Webhook sent successfully for invoice {invoice_id}.")
                     except requests.exceptions.RequestException as e:
@@ -101,6 +102,44 @@ def payment_status_checker():
                 logging.error(f"Error checking status for invoice {invoice_id}: {e}")
                 
         time.sleep(6)
+
+@app.route('/')
+def home():
+    """
+    Endpoint for the web server's homepage with a smooth UI.
+    Endpoint សម្រាប់ទំព័រដើមរបស់ web server ជាមួយនឹង UI រលូន។
+    """
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bakong KHQR Payments</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+            body {
+                font-family: 'Inter', sans-serif;
+            }
+        </style>
+    </head>
+    <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-700 text-center">
+            <h1 class="text-3xl font-bold text-white mb-4">Bakong KHQR Payments</h1>
+            <p class="text-lg text-slate-400 mb-6">
+                This server handles payment requests for your Telegram Bot.
+            </p>
+            <p class="text-slate-400">
+                To generate a payment QR code, please use the `/pay` command in your bot.
+            </p>
+            <a href="https://t.me/bots_business" class="mt-8 inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-transform transform hover:scale-105">
+                Go to the Bot
+            </a>
+        </div>
+    </body>
+    </html>
+    """)
 
 @app.route('/generate_qr', methods=['GET'])
 def generate_qr():
@@ -149,6 +188,8 @@ def generate_qr():
         
         qr_data_uri = create_qr_data_uri(qr_code_data)
         
+        # HTML for QR code page, same as before for consistency and good UX
+        # HTML សម្រាប់ទំព័រ QR code, ដូចមុនសម្រាប់ភាពស្របគ្នា និង UX ល្អ
         html_content = """
         <!DOCTYPE html>
         <html lang="en">
@@ -249,8 +290,6 @@ payment_checker_thread.start()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
-
 
 
 
