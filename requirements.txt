@@ -1,5 +1,1 @@
-Flask
-requests
-qrcode
-Pillow
-bakong_khqr
+Flask qrcode[pil]
