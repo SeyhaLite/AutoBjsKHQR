@@ -16,14 +16,13 @@ import json
 app = Flask(__name__)
 
 # --- Configuration ---
-# IMPORTANT: Replace "YOUR_BAKONG_API_TOKEN" with your actual Bakong API token.
-# សំខាន់: ជំនួស "YOUR_BAKONG_API_TOKEN" ដោយ Bakong API token ពិតប្រាកដរបស់អ្នក។
+# ✅ Bakong API token has been updated with the token you provided.
+# ✅ Bakong API token ត្រូវបានធ្វើបច្ចុប្បន្នភាពជាមួយនឹង token ដែលអ្នកបានផ្តល់។
 BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiYjljMWE3MjE3ZWQ4NGRhIn0sImlhdCI6MTc1NDExNTUyOCwiZXhwIjoxNzYxODkxNTI4fQ.Ad-_Z_jUtsxiiEAY--bvtPMaiabVDYEc1C1ES-ctHaU"
 BAKONG_CREATE_QR_URL = "https://api.bakong.nbc.gov.kh/v1/qr"
 BAKONG_CHECK_STATUS_URL = "https://api.bakong.nbc.gov.kh/v1/transaction/status"
 
 pending_payments = {}
-
 logging.basicConfig(level=logging.INFO)
 
 def create_qr_data_uri(qr_data):
@@ -88,7 +87,6 @@ def payment_status_checker():
                     }
                     
                     try:
-                        # Call the BJS webhook to notify the bot about the successful payment
                         requests.post(bjs_webhook_url, json=webhook_data)
                         logging.info(f"Webhook sent successfully for invoice {invoice_id}.")
                     except requests.exceptions.RequestException as e:
@@ -148,13 +146,18 @@ def generate_qr():
     Endpoint សម្រាប់បង្កើត KHQR code សម្រាប់ការទូទាត់។
     """
     try:
+        # Check if the API token is configured
+        if BAKONG_API_TOKEN == "YOUR_BAKONG_API_TOKEN" or not BAKONG_API_TOKEN:
+            logging.error("Configuration Error: BAKONG_API_TOKEN is not set.")
+            return jsonify({"error": "Configuration Error: Bakong API Token is missing. Please set it in app.py"}), 500
+
         user_id = request.args.get('user_id')
         amount = float(request.args.get('amount'))
         invoice_id = request.args.get('invoice_id')
         webhook_url = request.args.get('webhook_url')
 
         if not all([user_id, amount, invoice_id, webhook_url]):
-            return "Missing parameters", 400
+            return jsonify({"error": "Missing parameters."}), 400
 
         payload = {
             "merchant": { "name": "My Bot Business" },
@@ -169,7 +172,7 @@ def generate_qr():
         }
 
         response = requests.post(BAKONG_CREATE_QR_URL, headers=headers, json=payload)
-        response.raise_for_status()
+        response.raise_for_status() # This will raise an exception for 4xx or 5xx status codes
         
         bakong_data = response.json()
         qr_code_data = bakong_data['qr_code']
@@ -188,8 +191,6 @@ def generate_qr():
         
         qr_data_uri = create_qr_data_uri(qr_code_data)
         
-        # HTML for QR code page, same as before for consistency and good UX
-        # HTML សម្រាប់ទំព័រ QR code, ដូចមុនសម្រាប់ភាពស្របគ្នា និង UX ល្អ
         html_content = """
         <!DOCTYPE html>
         <html lang="en">
@@ -278,18 +279,24 @@ def generate_qr():
             expires_at=expires_at.isoformat()
         )
 
+    except requests.exceptions.HTTPError as http_err:
+        logging.error(f"HTTP Error from Bakong API: {http_err.response.status_code} - {http_err.response.text}")
+        if http_err.response.status_code == 401:
+            return jsonify({"error": "Unauthorized: Invalid Bakong API Token. Please check your token in app.py"}), 401
+        else:
+            return jsonify({"error": f"Bakong API returned an error: {http_err.response.text}"}), http_err.response.status_code
     except requests.exceptions.RequestException as e:
-        logging.error(f"Bakong API request failed: {e}")
-        return jsonify({"error": "Failed to generate QR code. Please try again."}), 500
+        logging.error(f"Network or connection error with Bakong API: {e}")
+        return jsonify({"error": "Could not connect to Bakong API. Please check your internet connection."}), 503
+    except ValueError as ve:
+        logging.error(f"Invalid 'amount' parameter received: {ve}")
+        return jsonify({"error": "Invalid amount parameter. Please provide a valid number."}), 400
     except Exception as e:
         logging.error(f"An unexpected error occurred: {e}")
-        return jsonify({"error": "An unexpected error occurred."}), 500
+        return jsonify({"error": "An unexpected server error occurred."}), 500
 
 payment_checker_thread = threading.Thread(target=payment_status_checker, daemon=True)
 payment_checker_thread.start()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
-
-
